@@ -1,0 +1,15 @@
+langchain
+langchain-community
+langchain-huggingface
+langchain-text-splitters
+faiss-cpu
+sentence-transformers
+rank-bm25
+pypdf
+google-genai
+fastapi
+uvicorn
+streamlit
+pydantic
+pytest
+python-dotenv

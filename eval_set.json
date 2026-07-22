@@ -1,0 +1,80 @@
+[
+  {
+    "question": "How do you create a component in React?",
+    "reference": "A React component is a JavaScript function that returns markup. Its name must start with a capital letter.",
+    "expected_source": "React Documentation.pdf",
+    "expected_page": 1
+  },
+  {
+    "question": "Why must React component names start with a capital letter?",
+    "reference": "The capital letter is how React distinguishes components from lowercase HTML tags.",
+    "expected_source": "React Documentation.pdf",
+    "expected_page": 2
+  },
+  {
+    "question": "What is JSX?",
+    "reference": "JSX is the markup syntax used in React. It is optional but widely used, and is stricter than HTML.",
+    "expected_source": "React Documentation.pdf",
+    "expected_page": 2
+  },
+  {
+    "question": "How do you display a JavaScript variable inside JSX?",
+    "reference": "Use curly braces to escape back into JavaScript and embed a variable, for example {user.name}.",
+    "expected_source": "React Documentation.pdf",
+    "expected_page": 3
+  },
+  {
+    "question": "How do you specify a CSS class in React?",
+    "reference": "You use the className attribute, which works like the HTML class attribute.",
+    "expected_source": "React Documentation.pdf",
+    "expected_page": 3
+  },
+  {
+    "question": "How do you render a list of items in React?",
+    "reference": "Use the array map() function to transform an array into a list of JSX elements, giving each a unique key prop.",
+    "expected_source": "React Documentation.pdf",
+    "expected_page": 6
+  },
+  {
+    "question": "Why does each list item need a key attribute?",
+    "reference": "A key uniquely identifies an item among its siblings so React knows what changed when items are inserted, deleted, or reordered.",
+    "expected_source": "React Documentation.pdf",
+    "expected_page": 6
+  },
+  {
+    "question": "How do you respond to an event in React?",
+    "reference": "Declare an event handler function inside the component and pass it to an element, for example onClick={handleClick}, without calling it.",
+    "expected_source": "React Documentation.pdf",
+    "expected_page": 7
+  },
+  {
+    "question": "How do you add state to a component?",
+    "reference": "Import useState from React and declare a state variable with the current value and a setter, for example const [count, setCount] = useState(0).",
+    "expected_source": "React Documentation.pdf",
+    "expected_page": 7
+  },
+  {
+    "question": "What are Hooks in React?",
+    "reference": "Functions starting with 'use' are Hooks. They can only be called at the top of components or other Hooks.",
+    "expected_source": "React Documentation.pdf",
+    "expected_page": 9
+  },
+  {
+    "question": "What does lifting state up mean?",
+    "reference": "Moving shared state from child components up to their closest common parent, then passing it down as props so components share and update together.",
+    "expected_source": "React Documentation.pdf",
+    "expected_page": 11
+  },
+  {
+    "question": "What are props in React?",
+    "reference": "Props are the information passed from a parent component down to a child component using JSX curly braces.",
+    "expected_source": "React Documentation.pdf",
+    "expected_page": 11
+  },
+  {
+    "question": "What is the capital of France?",
+    "reference": "NOT_IN_DOCUMENTS. The correct behavior is to say the answer is not in the documents.",
+    "expected_source": "React Documentation.pdf",
+    "expected_page": 0
+  }
+]
