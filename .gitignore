@@ -4,3 +4,4 @@ __pycache__/
 faiss_index/
 data/*.pdf
 .pytest_cache/
+.DS_Store
