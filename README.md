@@ -1,55 +1,38 @@
 # DocuQuery AI
 
-A document Q&A system over your own PDFs. It retrieves relevant passages using
-**hybrid search** (keyword + semantic), generates an answer grounded only in
-those passages, and **cites the source page** for every answer. Ships with an
-evaluation harness so retrieval and answer quality are measured, not guessed.
+A document Q&A system over your own PDFs. It retrieves relevant passages using **hybrid search** (BM25 + semantic vector search), generates an answer grounded only in those passages, and cites the source page for every answer. The project also includes an evaluation harness so retrieval quality can be measured instead of guessed.
 
 ## Why this design
 
-- **Hybrid retrieval (BM25 + vector, fused with RRF).** Vector search finds
-  semantically similar text but misses exact tokens (names, IDs, rare terms like
-  "FAISS"); BM25 nails exact tokens but misses paraphrase. Reciprocal Rank Fusion
-  merges the two ranked lists on rank position, so their incompatible score
-  scales don't need normalizing.
-- **Source citations.** Every answer lists the `file (p.N)` passages it used —
-  the difference between a trustworthy tool and a black box.
-- **Refuses rather than hallucinates.** The prompt is constrained to the retrieved
-  context, so when the answer genuinely isn't in the documents the system says so
-  instead of inventing one from the model's general knowledge.
-- **Evaluated.** `evaluate.py` measures retrieval hit rate @k and answer quality
-  (LLM-as-judge) over a hand-written question set, so config changes (hybrid vs
-  vector-only, k, chunk size) can be compared with numbers.
-- **Swappable LLM backend** behind a small interface; defaults to Google's
-  `gemini-flash-latest` alias so the app survives provider version changes.
+- **Hybrid retrieval (BM25 + vector, fused with RRF).** Vector search is strong at semantic similarity but can miss exact tokens such as names, IDs, or uncommon technical terms. BM25 complements it with lexical matching, while Reciprocal Rank Fusion combines both ranked lists without requiring score normalization.
+- **Source citations.** Every answer carries `file (p.N)` provenance from the retrieved chunks.
+- **Grounded generation.** The prompt constrains the model to retrieved context and instructs it to say when the answer is not present instead of filling gaps from general model knowledge.
+- **Evaluation harness.** `evaluate.py` measures retrieval hit rate @k and uses an LLM-as-judge score for answer quality over a hand-written evaluation set.
+- **Swappable generation backend.** LLM generation is isolated behind a small interface; the default backend uses Google's Gemini API.
 
 ## Results
 
-Evaluated on a hand-built question set over a technical documentation corpus,
-measuring whether the correct source page appears in the retrieved top-k:
+The checked-in evaluation set contains 13 questions over a React documentation corpus. Retrieval hit rate measures whether the expected source page appears in the retrieved top-5 results.
 
-| Retrieval mode        | Hit rate @5 | Mean answer score |
-|-----------------------|-------------|-------------------|
-| Hybrid (BM25 + vector)| **97%**     | 5.0 / 5           |
-| Vector only           | 90%         | 5.0 / 5           |
+| Retrieval mode | Correct source page in top 5 | Hit rate @5 |
+|---|---:|---:|
+| Hybrid (BM25 + vector) | 12 / 13 | **92%** |
+| Vector only | 11 / 13 | 85% |
 
-Hybrid retrieval recovered a keyword-heavy question that vector search alone
-missed entirely — semantic search returned neighbouring pages, while BM25 matched
-the exact term and pulled the right page into the results through fusion.
+The improvement came from a keyword-heavy query where semantic retrieval returned nearby pages but BM25 matched the exact term and brought the expected page into the fused result set.
 
-> Small benchmark (13 questions, one corpus), so this is a demonstration of
-> the method rather than a robust benchmark.
+> This is intentionally a small project benchmark, not a general retrieval benchmark. The included `eval_set.json` and `evaluate.py` make the experiment reproducible and easy to extend with additional documents and questions.
 
 ## Architecture
 
-```
+```text
  PDFs ──► ingest.py ──► FAISS index + chunks.json (text + provenance)
                               │
  question ──► RAGPipeline ────┤
                               ├─ vector search (FAISS) ─┐
                               ├─ BM25 (rank_bm25) ──────┤─► RRF fusion ─► top-k
                               │                          │
-                              └─ build prompt (top-k + citations) ─► Gemini
+                              └─ build grounded prompt ──► Gemini
                                           │
                                           ▼
                               Answer{ text, sources[] }
@@ -61,23 +44,22 @@ the exact term and pulled the right page into the results through fusion.
 
 ## Project structure
 
-```
-config.py           all tuning knobs in one place (chunk size, top_k, RRF constant, hybrid on/off)
-ingest.py           PDF loading → chunking → embeddings → FAISS index + chunk manifest
-retrieval.py        hybrid retriever: BM25 + vector search fused with RRF
-generation.py       prompt construction + swappable LLM backend
-rag.py              orchestration: retrieve → build prompt → generate → return answer + sources
+```text
+config.py           retrieval and generation configuration
+ingest.py           PDF loading, chunking, embeddings, FAISS index, chunk manifest
+retrieval.py        BM25 + vector retrieval with Reciprocal Rank Fusion
+generation.py       prompt construction and LLM backend abstraction
+rag.py              orchestration: retrieve → prompt → generate → answer + sources
 app.py              FastAPI /query endpoint
-streamlit_app.py    Streamlit UI (shows answers with their source pages)
-evaluate.py         evaluation harness (retrieval hit rate + LLM-as-judge scoring)
-tests/              unit tests for RRF fusion and hybrid vs vector-only behaviour
+streamlit_app.py    Streamlit UI
+evaluate.py         retrieval hit-rate and answer-quality evaluation harness
+eval_set.json       hand-written evaluation questions and expected source pages
+tests/              unit tests for RRF and hybrid retrieval behavior
 ```
 
 ## Setup
 
-Use a dedicated virtual environment — the pinned versions in
-`requirements.txt` are chosen to work together, and installing them into a
-shared/base environment can conflict with other projects' dependencies.
+Use a dedicated virtual environment so the project's Python dependencies stay isolated from other environments.
 
 ```bash
 python3 -m venv .venv
@@ -85,37 +67,52 @@ source .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install --upgrade pip
 pip install -r requirements.txt
 
-cp .env.example .env             # then add your GEMINI_API_KEY
+cp .env.example .env
 ```
 
-Get a free Gemini API key at https://aistudio.google.com/apikey
+Then add your Gemini API key to `.env`:
+
+```text
+GEMINI_API_KEY=your_api_key_here
+```
 
 ## Usage
 
+First, place PDFs in `data/` and build the index:
+
 ```bash
-# 1. Put PDFs in data/, then build the index
 python ingest.py
+```
 
-# 2a. Ask via the REST API
+Run the REST API:
+
+```bash
 uvicorn app:app --reload
-curl -X POST localhost:8000/query -H "Content-Type: application/json" \
-  -d '{"question": "what is the refund policy?"}'
+```
 
-# 2b. Or the UI
+Example request:
+
+```bash
+curl -X POST http://localhost:8000/query \
+  -H "Content-Type: application/json" \
+  -d '{"question":"How do you add state to a React component?"}'
+```
+
+Or launch the Streamlit UI:
+
+```bash
 streamlit run streamlit_app.py
 ```
 
 ## Evaluation
 
-Fill in `eval_set.json` with question / reference / expected-source triples, then:
+The evaluation set stores each question, reference answer, expected source document, and expected page. Run:
 
 ```bash
 python evaluate.py
 ```
 
-Reports retrieval hit rate @k and mean answer score. To compare configs, edit
-`config.py` (e.g. `use_hybrid=False`, or `top_k=3`) and re-run — the printout
-labels each run with its config, so runs are directly comparable.
+The harness reports retrieval hit rate @k and a mean answer-quality score. To compare configurations, change retrieval settings in `config.py` — for example `use_hybrid=False` for vector-only retrieval — and rerun the evaluation.
 
 ## Tests
 
@@ -123,9 +120,25 @@ labels each run with its config, so runs are directly comparable.
 pytest
 ```
 
-Covers RRF fusion correctness and hybrid vs vector-only retrieval behaviour.
+The unit tests cover:
 
-## Config
+- Reciprocal Rank Fusion behavior
+- agreement between lexical and vector rankings
+- BM25 lifting exact-keyword matches
+- vector-only fallback behavior
+- citation formatting
 
-All knobs live in `config.py`: chunk size/overlap, embedding model, `top_k`,
-`candidate_k`, RRF constant, and the hybrid on/off switch.
+GitHub Actions runs the test suite on every push to `main` and on pull requests.
+
+## Configuration
+
+The main tuning parameters live in `config.py`:
+
+- chunk size and overlap
+- embedding model
+- final `top_k`
+- per-retriever candidate count
+- RRF smoothing constant
+- hybrid/vector-only switch
+- Gemini model
+- maximum prompt context size

@@ -1,5 +1,5 @@
 """Central configuration. Single source of truth so ingest and query never drift."""
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 
@@ -20,7 +20,7 @@ class Config:
     top_k: int = 5                # final chunks passed to the LLM
     candidate_k: int = 10         # per-retriever candidates before fusion
     rrf_k: int = 60               # RRF smoothing constant (standard default)
-    use_hybrid: bool = False       # BM25 + vector; False = vector only
+    use_hybrid: bool = True       # BM25 + vector; False = vector only
 
     # Generation
     gemini_model: str = "gemini-flash-latest"
