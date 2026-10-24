@@ -10,18 +10,13 @@ A document Q&A system over your own PDFs. It retrieves relevant passages using *
 - **Evaluation harness.** `evaluate.py` measures retrieval hit rate @k and uses an LLM-as-judge score for answer quality over a hand-written evaluation set.
 - **Swappable generation backend.** LLM generation is isolated behind a small interface; the default backend uses Google's Gemini API.
 
-## Results
+## Evaluation methodology
 
-The checked-in evaluation set contains 13 questions over a React documentation corpus. Retrieval hit rate measures whether the expected source page appears in the retrieved top-5 results.
+The checked-in set contains **13 questions**: **12 answerable** questions with expected PDF pages and **1 intentionally out-of-scope** question (expected page 0).
 
-| Retrieval mode | Correct source page in top 5 | Hit rate @5 |
-|---|---:|---:|
-| Hybrid (BM25 + vector) | 12 / 13 | **92%** |
-| Vector only | 11 / 13 | 85% |
+Run `python evaluate.py` after ingesting the React documentation PDF and providing a Gemini API key. The updated evaluator reports **retrieval hit rate @5 on only the 12 answerable questions**. The out-of-scope prompt is printed separately for **manual abstention review**, because it has no correct document page. It is not counted as a retrieval miss or automatic abstention success.
 
-The improvement came from a keyword-heavy query where semantic retrieval returned nearby pages but BM25 matched the exact term and brought the expected page into the fused result set.
-
-> This is intentionally a small project benchmark, not a general retrieval benchmark. The included `eval_set.json` and `evaluate.py` make the experiment reproducible and easy to extend with additional documents and questions.
+Earlier experimental figures of **12/13 hybrid** and **11/13 vector-only** mixed the out-of-scope question into the denominator. Those figures are **not comparable to the corrected answerable-only metric**, and should not be cited as current validated scores until both configurations are rerun on the same indexed corpus. The evaluation set is small and should not be presented as a general benchmark.
 
 ## Architecture
 

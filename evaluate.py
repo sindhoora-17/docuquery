@@ -31,12 +31,18 @@ class EvalItem:
     expected_source: str   # "filename.pdf"
     expected_page: int
 
+    @property
+    def answerable(self) -> bool:
+        return self.expected_page > 0
+
 
 def load_eval_set(path: Path) -> List[EvalItem]:
     return [EvalItem(**r) for r in json.loads(path.read_text())]
 
 
 def retrieval_hit(pipeline: RAGPipeline, item: EvalItem) -> bool:
+    if not item.answerable:
+        raise ValueError("Retrieval hit rate applies only to answerable questions")
     chunks = pipeline._retriever.retrieve(item.question, CONFIG.top_k)
     got_pages = [(c.source, c.page) for c in chunks]
     hit = any(
@@ -68,8 +74,10 @@ def run(eval_path: str = "eval_set.json") -> None:
     pipeline = RAGPipeline(backend)
     items = load_eval_set(Path(eval_path))
 
+    answerable = [it for it in items if it.answerable]
+    out_of_scope = [it for it in items if not it.answerable]
     hits, scores = 0, []
-    for it in items:
+    for it in answerable:
         hit = retrieval_hit(pipeline, it)
         ans = pipeline.answer(it.question)
         score = judge_answer(backend, it, ans.text)
@@ -77,11 +85,23 @@ def run(eval_path: str = "eval_set.json") -> None:
         scores.append(score)
         print(f"  hit={hit!s:5} score={score}  {it.question[:50]}")
 
-    n = len(items)
-    print(f"\nConfig: hybrid={CONFIG.use_hybrid} top_k={CONFIG.top_k} "
+    print(f"\\nConfig: hybrid={CONFIG.use_hybrid} top_k={CONFIG.top_k} "
           f"chunk={CONFIG.chunk_size}/{CONFIG.chunk_overlap}")
-    print(f"Retrieval hit rate @{CONFIG.top_k}: {hits}/{n} = {hits/n:.0%}")
-    print(f"Mean answer score: {sum(scores)/n:.2f} / 5")
+    if answerable:
+        print(f"Answerable retrieval hit rate @{CONFIG.top_k}: "
+              f"{hits}/{len(answerable)} = {hits/len(answerable):.0%}")
+        print(f"Mean answer score: {sum(scores)/len(scores):.2f} / 5")
+    else:
+        print("No answerable retrieval questions.")
+
+    # Negative questions are intentionally excluded from retrieval hit-rate:
+    # no valid expected source page exists to retrieve.
+    print(f"Out-of-scope questions: {len(out_of_scope)} (excluded from retrieval hit rate)")
+    for item in out_of_scope:
+        answer = pipeline.answer(item.question)
+        print(f"  [manual abstention review] {item.question} -> {answer.text}")
+    print("Out-of-scope responses require manual review; no automatic abstention "
+          "accuracy is claimed.")
 
 
 if __name__ == "__main__":
